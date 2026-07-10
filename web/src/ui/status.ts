@@ -23,12 +23,7 @@ export function renderIssueGroup(
   tone: 'error' | 'warning',
 ): string {
   if (issues.length === 0) {
-    return `
-      <section class="issue-group ${tone}">
-        <h3>${title}</h3>
-        <p class="empty-state">No ${tone}s.</p>
-      </section>
-    `;
+    return '';
   }
 
   return `

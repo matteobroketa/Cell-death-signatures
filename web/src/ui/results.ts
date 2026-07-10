@@ -1,35 +1,101 @@
-import { calculatePearsonCorrelation } from '../lib/correlation';
+import { formatSampleLabel } from '../lib/format';
 import { escapeHtml } from '../lib/text';
 import { renderIssueGroup } from './status';
-import type { ModelPredictionResult, ResultTableRow } from '../lib/types';
+import type { ModelKey, ModelPredictionResult, ResultTableRow } from '../lib/types';
+
+function countStatus(result: ModelPredictionResult): string {
+  const errorCount = result.diagnostics.errors.length;
+  const warningCount = result.diagnostics.warnings.length;
+
+  if (errorCount > 0) {
+    return `${errorCount} error${errorCount === 1 ? '' : 's'}`;
+  }
+
+  if (warningCount > 0) {
+    return `${warningCount} warning${warningCount === 1 ? '' : 's'}`;
+  }
+
+  return 'ready';
+}
+
+function renderDiagnosticLists(result: ModelPredictionResult): string {
+  const sections: string[] = [];
+
+  if (result.diagnostics.errors.length > 0) {
+    sections.push(renderIssueGroup(`Errors (${result.diagnostics.errors.length})`, result.diagnostics.errors, 'error'));
+  }
+
+  if (result.diagnostics.warnings.length > 0) {
+    sections.push(renderIssueGroup(`Warnings (${result.diagnostics.warnings.length})`, result.diagnostics.warnings, 'warning'));
+  }
+
+  if (result.diagnostics.unmatchedUploadedGenes.length > 0) {
+    sections.push(`
+      <details class="details-block">
+        <summary>Uploaded genes absent from model (${result.diagnostics.unmatchedUploadedGenes.length})</summary>
+        <p class="gene-list">${escapeHtml(result.diagnostics.unmatchedUploadedGenes.join(', '))}</p>
+      </details>
+    `);
+  }
+
+  if (result.diagnostics.modelGenesAbsentFromUpload.length > 0) {
+    sections.push(`
+      <details class="details-block">
+        <summary>Model genes absent from input (${result.diagnostics.modelGenesAbsentFromUpload.length})</summary>
+        <p class="gene-list">${escapeHtml(result.diagnostics.modelGenesAbsentFromUpload.join(', '))}</p>
+      </details>
+    `);
+  }
+
+  if (result.diagnostics.matchedGenes.length > 0) {
+    sections.push(`
+      <details class="details-block">
+        <summary>Matched genes (${result.diagnostics.matchedGenes.length})</summary>
+        <p class="gene-list">${escapeHtml(result.diagnostics.matchedGenes.join(', '))}</p>
+      </details>
+    `);
+  }
+
+  return sections.join('');
+}
 
 function renderDiagnosticsCard(result: ModelPredictionResult, formatPercentage: (value: number) => string): string {
   const matchedCount = result.diagnostics.matchedGenes.length;
+  const totalGenes = result.model.genes.length;
+
   return `
     <article class="diagnostic-card">
-      <h3>${escapeHtml(result.model.metadata.label)}</h3>
-      <dl class="summary-grid">
-        <div><dt>Matched genes</dt><dd>${matchedCount}</dd></div>
-        <div><dt>Total model genes</dt><dd>${result.model.genes.length}</dd></div>
-        <div><dt>Coverage</dt><dd>${formatPercentage(result.diagnostics.coveragePercentage)}</dd></div>
-        <div><dt>Uploaded-only genes</dt><dd>${result.diagnostics.unmatchedUploadedGenes.length}</dd></div>
-        <div><dt>Model genes absent from input</dt><dd>${result.diagnostics.modelGenesAbsentFromUpload.length}</dd></div>
-        <div><dt>Samples</dt><dd>${result.diagnostics.sampleCount}</dd></div>
+      <div class="diagnostic-card__header">
+        <div>
+          <h3>${escapeHtml(result.model.metadata.label)}</h3>
+          <p class="diagnostic-card__status">${escapeHtml(countStatus(result))}</p>
+        </div>
+        <div class="diagnostic-card__summary">
+          <strong>${matchedCount}/${totalGenes}</strong>
+          <span>genes matched</span>
+        </div>
+      </div>
+      <div class="coverage-meter" aria-label="${escapeHtml(result.model.metadata.label)} coverage ${formatPercentage(result.diagnostics.coveragePercentage)}">
+        <div class="coverage-meter__track">
+          <span class="coverage-meter__fill" style="width: ${result.diagnostics.coveragePercentage}%"></span>
+        </div>
+        <span class="coverage-meter__value">${formatPercentage(result.diagnostics.coveragePercentage)}</span>
+      </div>
+      <dl class="summary-grid summary-grid--tight">
+        <div class="summary-card">
+          <dt>Samples</dt>
+          <dd class="summary-value">${result.diagnostics.sampleCount}</dd>
+        </div>
+        <div class="summary-card">
+          <dt>Uploaded genes</dt>
+          <dd class="summary-value">${result.diagnostics.totalUploadedGenes}</dd>
+        </div>
+        <div class="summary-card">
+          <dt>Missing model genes</dt>
+          <dd class="summary-value">${result.diagnostics.modelGenesAbsentFromUpload.length}</dd>
+        </div>
       </dl>
-      ${renderIssueGroup('Model warnings', result.diagnostics.warnings, 'warning')}
-      ${renderIssueGroup('Model errors', result.diagnostics.errors, 'error')}
-      <details>
-        <summary>Matched genes (${matchedCount})</summary>
-        <p class="gene-list">${escapeHtml(result.diagnostics.matchedGenes.join(', ') || 'None')}</p>
-      </details>
-      <details>
-        <summary>Uploaded genes absent from model (${result.diagnostics.unmatchedUploadedGenes.length})</summary>
-        <p class="gene-list">${escapeHtml(result.diagnostics.unmatchedUploadedGenes.join(', ') || 'None')}</p>
-      </details>
-      <details>
-        <summary>Model genes absent from input (${result.diagnostics.modelGenesAbsentFromUpload.length})</summary>
-        <p class="gene-list">${escapeHtml(result.diagnostics.modelGenesAbsentFromUpload.join(', ') || 'None')}</p>
-      </details>
+      ${renderDiagnosticLists(result)}
     </article>
   `;
 }
@@ -42,89 +108,116 @@ function sortLabel(column: 'sample' | 'achilles' | 'ctrp', activeColumn: 'sample
   return direction === 'asc' ? 'ascending' : 'descending';
 }
 
+function renderResultHeader(modelKey: ModelKey): string {
+  const label = modelKey === 'achilles' ? 'Achilles' : 'CTRP';
+
+  return `
+    <th colspan="3" scope="colgroup" class="group-header">${label}</th>
+  `;
+}
+
+function renderResultColumnHeader(
+  modelKey: ModelKey,
+  sortColumn: 'sample' | 'achilles' | 'ctrp',
+  sortDirection: 'asc' | 'desc',
+): string {
+  const label = modelKey === 'achilles' ? 'Achilles score' : 'CTRP score';
+
+  return `
+    <th scope="col" class="numeric-col" aria-sort="${sortLabel(modelKey, sortColumn, sortDirection)}">
+      <button class="sort-button" data-sort-column="${modelKey}" aria-label="Sort by ${label}">
+        Score ${sortColumn === modelKey ? `(${sortDirection})` : ''}
+      </button>
+    </th>
+    <th scope="col" class="numeric-col">Matched genes</th>
+    <th scope="col" class="numeric-col">Coverage</th>
+  `;
+}
+
+function renderResultCell(row: ResultTableRow, modelKey: ModelKey, formatCompactNumber: (value: number) => string, formatPercentage: (value: number) => string): string {
+  if (modelKey === 'achilles') {
+    return `
+      <td class="numeric-col">${row.achilles !== undefined ? formatCompactNumber(row.achilles) : '—'}</td>
+      <td class="numeric-col">${row.achillesMatchedGenes ?? '—'}</td>
+      <td class="numeric-col">${row.achillesCoveragePercentage !== undefined ? formatPercentage(row.achillesCoveragePercentage) : '—'}</td>
+    `;
+  }
+
+  return `
+    <td class="numeric-col">${row.ctrp !== undefined ? formatCompactNumber(row.ctrp) : '—'}</td>
+    <td class="numeric-col">${row.ctrpMatchedGenes ?? '—'}</td>
+    <td class="numeric-col">${row.ctrpCoveragePercentage !== undefined ? formatPercentage(row.ctrpCoveragePercentage) : '—'}</td>
+  `;
+}
+
 export function renderResultsSection(
   predictionResults: ModelPredictionResult[],
   rows: ResultTableRow[],
   sortColumn: 'sample' | 'achilles' | 'ctrp',
   sortDirection: 'asc' | 'desc',
-  formatReadableNumber: (value: number) => string,
+  formatCompactNumber: (value: number) => string,
   formatPercentage: (value: number) => string,
 ): string {
-  const showScatterHint =
-    rows.length >= 2 && rows.every((row) => row.achilles !== undefined && row.ctrp !== undefined);
-  const correlation = showScatterHint
-    ? calculatePearsonCorrelation(
-        rows.map((row) => row.achilles ?? 0),
-        rows.map((row) => row.ctrp ?? 0),
-      )
-    : undefined;
+  if (predictionResults.length === 0) {
+    return `
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Results</h2>
+          <p>Predictions, diagnostics and CSV export appear after a successful run.</p>
+        </div>
+        <p class="empty-state">Run a prediction to populate model diagnostics and result tables.</p>
+      </section>
+    `;
+  }
+
+  const selectedModels = predictionResults.map((result) => result.model.metadata.key);
 
   return `
     <section class="panel">
       <div class="panel-heading">
-        <h2>Results</h2>
-        <p>Sortable predictions with full-precision CSV export.</p>
+        <div>
+          <h2>Results</h2>
+          <p>Compact on-screen precision for reading, full precision preserved in downloads.</p>
+        </div>
+        <div class="panel-actions">
+          <button id="download-results" class="button secondary interactive-only" type="button">Download prediction CSV</button>
+        </div>
       </div>
-      ${
-        predictionResults.length === 0
-          ? '<p class="empty-state">Run a prediction to populate results, diagnostics and plots.</p>'
-          : `
-            <div class="button-row">
-              <button id="download-results" class="button primary" type="button">Download prediction CSV</button>
-            </div>
-            <div class="diagnostic-grid">
-              ${predictionResults.map((result) => renderDiagnosticsCard(result, formatPercentage)).join('')}
-            </div>
-            <div class="table-wrap">
-              <table class="data-table">
-                <thead>
+      <div class="diagnostic-grid">
+        ${predictionResults.map((result) => renderDiagnosticsCard(result, formatPercentage)).join('')}
+      </div>
+      <div class="table-wrap table-wrap--results" role="region" aria-label="Prediction results table">
+        <table class="data-table results-table">
+          <thead>
+            <tr>
+              <th rowspan="2" scope="col" class="sticky-col" aria-sort="${sortLabel('sample', sortColumn, sortDirection)}">
+                <button class="sort-button" data-sort-column="sample" aria-label="Sort by sample">
+                  Sample ${sortColumn === 'sample' ? `(${sortDirection})` : ''}
+                </button>
+              </th>
+              ${selectedModels.map(renderResultHeader).join('')}
+            </tr>
+            <tr>
+              ${selectedModels.map((modelKey) => renderResultColumnHeader(modelKey, sortColumn, sortDirection)).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${rows
+              .map((row) => {
+                const sampleLabel = formatSampleLabel(row.sample);
+                return `
                   <tr>
-                    <th scope="col" aria-sort="${sortLabel('sample', sortColumn, sortDirection)}"><button class="sort-button" data-sort-column="sample" aria-label="Sort by sample">Sample ${sortColumn === 'sample' ? `(${sortDirection})` : ''}</button></th>
-                    <th scope="col" aria-sort="${sortLabel('achilles', sortColumn, sortDirection)}"><button class="sort-button" data-sort-column="achilles" aria-label="Sort by Achilles score">Achilles ${sortColumn === 'achilles' ? `(${sortDirection})` : ''}</button></th>
-                    <th>Achilles matched genes</th>
-                    <th>Achilles coverage</th>
-                    <th scope="col" aria-sort="${sortLabel('ctrp', sortColumn, sortDirection)}"><button class="sort-button" data-sort-column="ctrp" aria-label="Sort by CTRP score">CTRP ${sortColumn === 'ctrp' ? `(${sortDirection})` : ''}</button></th>
-                    <th>CTRP matched genes</th>
-                    <th>CTRP coverage</th>
+                    <th scope="row" class="sticky-col sample-cell" title="${escapeHtml(row.sample)}" aria-label="${escapeHtml(`Sample ${sampleLabel.displayLabel}. Original name ${row.sample}`)}">
+                      <span class="sample-label">${escapeHtml(sampleLabel.displayLabel)}</span>
+                    </th>
+                    ${selectedModels.map((modelKey) => renderResultCell(row, modelKey, formatCompactNumber, formatPercentage)).join('')}
                   </tr>
-                </thead>
-                <tbody>
-                  ${rows
-                    .map(
-                      (row) => `
-                        <tr>
-                          <td>${escapeHtml(row.sample)}</td>
-                          <td>${row.achilles !== undefined ? formatReadableNumber(row.achilles) : '—'}</td>
-                          <td>${row.achillesMatchedGenes ?? '—'}</td>
-                          <td>${row.achillesCoveragePercentage !== undefined ? formatPercentage(row.achillesCoveragePercentage) : '—'}</td>
-                          <td>${row.ctrp !== undefined ? formatReadableNumber(row.ctrp) : '—'}</td>
-                          <td>${row.ctrpMatchedGenes ?? '—'}</td>
-                          <td>${row.ctrpCoveragePercentage !== undefined ? formatPercentage(row.ctrpCoveragePercentage) : '—'}</td>
-                        </tr>
-                      `,
-                    )
-                    .join('')}
-                </tbody>
-              </table>
-            </div>
-            ${
-              correlation
-                ? `
-                  <p class="correlation-note">
-                    Pearson correlation:
-                    ${
-                      correlation.value !== undefined
-                        ? correlation.value.toFixed(4)
-                        : correlation.reason === 'constant-vector'
-                          ? 'not defined for constant vectors'
-                          : 'not defined for fewer than two paired samples'
-                    }
-                  </p>
-                `
-                : ''
-            }
-          `
-      }
+                `;
+              })
+              .join('')}
+          </tbody>
+        </table>
+      </div>
     </section>
   `;
 }
