@@ -29,6 +29,7 @@ figures/raw/SFig5E.pdf
 
 # Shiny related files/paths
 *.html
+!web/index.html
 ShinyCellDeathSignatures/data
 .Rhistory
 
