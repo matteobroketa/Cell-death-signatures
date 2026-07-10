@@ -1,0 +1,26 @@
+{
+  "name": "static-ceviche",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/model-hashes.mjs && vite",
+    "build": "node scripts/model-hashes.mjs && tsc --project tsconfig.json && vite build",
+    "preview": "vite preview",
+    "test": "node scripts/model-hashes.mjs && vitest",
+    "test:run": "node scripts/model-hashes.mjs && vitest run",
+    "typecheck": "node scripts/model-hashes.mjs && tsc --project tsconfig.json",
+    "validate:parity": "node scripts/model-hashes.mjs && tsx scripts/validate-parity.ts"
+  },
+  "dependencies": {
+    "papaparse": "^5.5.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.15",
+    "@types/papaparse": "^5.3.16",
+    "tsx": "^4.20.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1",
+    "vitest": "^4.0.0"
+  }
+}

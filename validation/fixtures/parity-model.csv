@@ -1,0 +1,8 @@
+,pr_gene_symbol,coefficient
+100,GENE_A,0.5
+101,GENE_B,-1.25
+102,GENE_C,2
+103,GENE_D,0
+104,GENE_E,-0.75
+105,GENE_F,1.5
+INTERCEPT,0.2,0.2

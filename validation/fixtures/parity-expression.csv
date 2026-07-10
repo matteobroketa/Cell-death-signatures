@@ -1,0 +1,7 @@
+gene,Sample_1,Sample_2,Sample_3
+GENE_C,1,0.5,-1
+EXTRA_X,2,2,2
+GENE_A,-2,1,0
+GENE_E,0,3,-4
+GENE_B,5,-1,2
+GENE_D,7,7,7

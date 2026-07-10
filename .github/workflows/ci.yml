@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - 'web/**'
+      - 'models/**'
+      - 'validation/**'
+      - '.github/workflows/**'
+      - '.gitignore'
+      - 'README.md'
+  push:
+    paths:
+      - 'web/**'
+      - 'models/**'
+      - 'validation/**'
+      - '.github/workflows/**'
+      - '.gitignore'
+      - 'README.md'
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - uses: r-lib/actions/setup-r@v2
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: web
+
+      - name: Test
+        run: npm run test:run
+        working-directory: web
+
+      - name: Type check
+        run: npm run typecheck
+        working-directory: web
+
+      - name: Build
+        run: npm run build
+        working-directory: web
+
+      - name: Parity validation
+        run: npm run validate:parity
+        working-directory: web

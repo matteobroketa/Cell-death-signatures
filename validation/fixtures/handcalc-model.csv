@@ -1,0 +1,7 @@
+,pr_gene_symbol,coefficient
+1,ALPHA,1
+2,BETA,-2
+3,GAMMA,0.5
+4,DELTA,3
+5,EPSILON,-1.5
+INTERCEPT,-0.25,-0.25

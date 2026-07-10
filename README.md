@@ -5,6 +5,29 @@ Transcriptomics perturbation signatures are valuable data sources for functional
 
 The corresponding article for this project is available at [Nucleic Acids Research](https://academic.oup.com/nar/advance-article/doi/10.1093/nar/gkz805/5573547?guestAccessKey=151831e1-0f78-4c70-854c-a471a28a5eac). We also proveide an R Shiny application, [CEVIChE](https://saezlab.shinyapps.io/ceviche/) (CEll VIability Calculator from gene Expression) to browse predicted cell viability values, and to perform predictions on any gene expression data online.
 
+## Static CEViChE predictor
+
+This repository now also contains a client-only static implementation under `web/` named **CEViChE Static — Cell Viability Prediction**.
+
+An unofficial static browser interface implementing the published CEViChE prediction models from the original Cell-death-signatures repository.
+
+- `ShinyCellDeathSignatures/` remains the legacy R Shiny application and historical reference implementation.
+- `web/` is the new browser-only Vite + TypeScript application for reproducible local development and GitHub Pages deployment.
+- The committed root model files `models/achilles.csv` and `models/ctrp.csv` are the scientific source of truth used by the static application.
+
+For local development of the static predictor:
+
+1. `cd web`
+2. `npm install`
+3. `npm run dev`
+
+For verification:
+
+1. `npm run test:run`
+2. `npm run typecheck`
+3. `npm run build`
+4. `npm run validate:parity`
+
 You have to clone / dowload the project, and run the different Jupyter Notebooks to reproduce our analysis
 
 **Libraries used**
